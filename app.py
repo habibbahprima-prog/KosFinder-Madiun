@@ -65,8 +65,40 @@ st.markdown("""
         background: #176b87; color: white; border: 0; border-radius: 10px;
         padding: .55rem 1.1rem; font-weight: 600;
     }
+    div.stButton > button, div.stFormSubmitButton > button,
+    div.stButton > button p, div.stFormSubmitButton > button p {
+        background: #176b87 !important;
+        color: #ffffff !important;
+        border: 0 !important;
+        font-weight: 700 !important;
+    }
     div.stButton > button:hover, div.stFormSubmitButton > button:hover {
-        background: #12546b; color: white;
+        background: #12546b !important;
+        color: #ffffff !important;
+    }
+    /* Hasil prediksi: teks putih di atas latar hijau */
+    div[data-testid="stAlert"][kind="success"],
+    div[data-testid="stAlert"][kind="success"] *,
+    div[data-testid="stAlert"][kind="success"] p {
+        background-color: #e7f5ef !important;
+        color: #145b3c !important;
+        border-color: #a8d8bf !important;
+        opacity: 1 !important;
+    }
+    /* Pastikan judul dan deskripsi banner tetap putih */
+    .hero, .hero h1, .hero p, .hero * {
+        color: #ffffff !important;
+        opacity: 1 !important;
+    }
+    /* Teks biasa dan hasil markdown tetap gelap di latar terang */
+    .stApp [data-testid="stMarkdownContainer"] p,
+    .stApp [data-testid="stMarkdownContainer"] li,
+    .stApp [data-testid="stMarkdownContainer"] strong,
+    .stApp label,
+    .stApp [data-testid="stMetricLabel"],
+    .stApp [data-testid="stMetricValue"] {
+        color: #1f2937 !important;
+        opacity: 1 !important;
     }
 </style>
 """, unsafe_allow_html=True)
