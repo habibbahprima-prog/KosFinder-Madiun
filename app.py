@@ -218,6 +218,42 @@ if page == "Ringkasan Dashboard":
     )
     show_ai_explanation("Ringkasan Dashboard", prompt)
 
+    st.markdown("### 🧮 Coba hitung perkiraan harga kos")
+    st.write(
+        "Pilih jenis kos dan kecamatan untuk mendapatkan estimasi harga bulanan "
+        "berdasarkan model Machine Learning yang telah dilatih."
+    )
+    with st.container(border=True):
+        with st.form("quick_prediction_form"):
+            q1, q2 = st.columns(2)
+            with q1:
+                quick_jenis = st.selectbox(
+                    "Jenis kos", sorted(data["Jenis Kos"].dropna().unique().tolist()),
+                    key="quick_jenis"
+                )
+            with q2:
+                quick_area = st.selectbox(
+                    "Kecamatan", sorted(data["Kecamatan"].dropna().unique().tolist()),
+                    key="quick_area"
+                )
+            quick_submit = st.form_submit_button(
+                "Hitung perkiraan harga", use_container_width=True
+            )
+    if quick_submit:
+        quick_input = pd.DataFrame([{
+            "Jenis Kos": quick_jenis,
+            "Kecamatan": quick_area
+        }])
+        try:
+            quick_estimate = float(model.predict(quick_input)[0])
+            st.success(f"Perkiraan harga kos: Rp{quick_estimate:,.0f} per bulan")
+            st.caption(
+                "Estimasi model, bukan harga pasti. Model saat ini hanya menggunakan "
+                "jenis kos dan kecamatan sebagai fitur."
+            )
+        except Exception as e:
+            st.error(f"Prediksi belum dapat dihitung: {e}")
+
     st.markdown("### Data kos terbaru")
     st.dataframe(
         data[["Nama Kos", "Jenis Kos", "Kecamatan", "Harga Bulanan (Rp)"]].head(10),
@@ -275,10 +311,14 @@ elif page == "Analisis Data":
     show_ai_explanation("Harga per Jenis Kos", prompt_type)
 
 elif page == "Prediksi Harga":
-    st.subheader("Prediksi harga kos")
+    st.subheader("🧮 Kalkulator Prediksi Harga Kos")
     st.write(
-        "Pilih jenis kos dan kecamatan. Model menggunakan dua fitur tersebut "
-        "untuk memperkirakan harga bulanan."
+        "Masukkan karakteristik kos melalui pilihan di bawah. Setelah tombol dihitung, "
+        "sistem akan memperkirakan harga sewa per bulan menggunakan model Machine Learning."
+    )
+    st.info(
+        "Fitur yang digunakan model saat ini adalah **Jenis Kos** dan **Kecamatan**. "
+        "Fasilitas, luas kamar, dan jarak belum menjadi masukan model."
     )
     jenis_opts = sorted(data["Jenis Kos"].dropna().unique().tolist())
     area_opts = sorted(data["Kecamatan"].dropna().unique().tolist())
@@ -293,7 +333,11 @@ elif page == "Prediksi Harga":
     if submitted:
         input_df = pd.DataFrame([{"Jenis Kos": jenis, "Kecamatan": area}])
         estimate = float(model.predict(input_df)[0])
-        st.success(f"Perkiraan harga: Rp{estimate:,.0f} per bulan")
+        st.success(f"## Rp{estimate:,.0f} / bulan")
+        st.caption(
+            f"Pilihan: {jenis} • Kecamatan {area}. "
+            "Hasil merupakan estimasi model, bukan harga pasti."
+        )
         show_ai_explanation(
             "Hasil Prediksi",
             f"Model memprediksi harga Rp{estimate:.0f} per bulan untuk jenis kos '{jenis}' "
