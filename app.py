@@ -8,7 +8,7 @@ from google import genai
 st.set_page_config(page_title="KosFinder Madiun", page_icon="🏠", layout="wide")
 
 DATA_URL = "https://raw.githubusercontent.com/habibbahprima-prog/KosFinder-Madiun/main/dataset_kos_madiun_diperluas.xlsx"
-MODEL_PATH = "models/model_kosfinder.joblib"
+MODEL_PATH = "model_kosfinder.joblib"
 
 @st.cache_data
 def load_data():
