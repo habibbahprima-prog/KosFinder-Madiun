@@ -5,11 +5,61 @@ import joblib
 import matplotlib.pyplot as plt
 from google import genai
 
-st.set_page_config(page_title="KosFinder Madiun", page_icon="🏠", layout="wide")
+# ==========================================================
+# KOSFINDER MADIUN - Dashboard Analisis & Prediksi Harga Kos
+# ==========================================================
 
-DATA_URL = "https://raw.githubusercontent.com/habibbahprima-prog/KosFinder-Madiun/main/dataset_kos_madiun_diperluas.xlsx"
+st.set_page_config(
+    page_title="KosFinder Madiun",
+    page_icon="🏠",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+DATA_URL = (
+    "https://raw.githubusercontent.com/habibbahprima-prog/"
+    "KosFinder-Madiun/main/dataset_kos_madiun_diperluas.xlsx"
+)
 MODEL_PATH = "model_kosfinder.joblib"
 
+# -------------------- Tampilan --------------------
+st.markdown("""
+<style>
+    .stApp { background: #f5f7fb; }
+    [data-testid="stHeader"] { background: rgba(245,247,251,0.92); }
+    .block-container { padding-top: 2rem; padding-bottom: 3rem; max-width: 1200px; }
+    .hero {
+        background: linear-gradient(115deg, #102a43 0%, #176b87 58%, #37a6a0 100%);
+        padding: 30px 34px; border-radius: 22px; color: white;
+        margin-bottom: 22px; box-shadow: 0 10px 28px rgba(16,42,67,.14);
+    }
+    .hero h1 { color: white; font-size: 2.25rem; margin: 0 0 8px 0; }
+    .hero p { color: #e5f4f5; font-size: 1rem; margin: 0; }
+    .section-card {
+        background: white; border: 1px solid #e7edf3; border-radius: 16px;
+        padding: 20px 22px; margin: 10px 0 18px 0;
+        box-shadow: 0 4px 14px rgba(16,42,67,.045);
+    }
+    .ai-box {
+        background: #eef8f7; border-left: 5px solid #168b83;
+        padding: 16px 18px; border-radius: 10px; margin: 8px 0 22px 0;
+    }
+    .small-muted { color: #607080; font-size: .9rem; }
+    div[data-testid="stMetric"] {
+        background: white; border: 1px solid #e7edf3; padding: 16px;
+        border-radius: 15px; box-shadow: 0 3px 12px rgba(16,42,67,.04);
+    }
+    div.stButton > button, div.stFormSubmitButton > button {
+        background: #176b87; color: white; border: 0; border-radius: 10px;
+        padding: .55rem 1.1rem; font-weight: 600;
+    }
+    div.stButton > button:hover, div.stFormSubmitButton > button:hover {
+        background: #12546b; color: white;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# -------------------- Data & model --------------------
 @st.cache_data
 def load_data():
     return pd.read_excel(DATA_URL, sheet_name="Data Harga")
@@ -18,111 +68,254 @@ def load_data():
 def load_model():
     return joblib.load(MODEL_PATH)
 
-def gemini_explain(prompt):
-    key = os.getenv("GEMINI_API_KEY", "")
+def get_gemini_key():
+    key = os.getenv("GEMINI_API_KEY", "").strip()
+    if key:
+        return key
     try:
-        if not key:
-            key = st.secrets.get("GEMINI_API_KEY", "")
+        return str(st.secrets["GEMINI_API_KEY"]).strip()
     except Exception:
-        pass
+        return ""
+
+def explain_with_gemini(title, prompt):
+    """Meminta Gemini menjelaskan ringkasan hasil hitung Python."""
+    key = get_gemini_key()
     if not key:
-        return "Penjelasan AI belum aktif. Tambahkan GEMINI_API_KEY pada Streamlit Secrets."
+        return (
+            "Penjelasan AI belum aktif karena GEMINI_API_KEY belum diatur. "
+            "Buka pengaturan aplikasi di Streamlit Community Cloud → Settings/Secrets, "
+            "lalu tambahkan GEMINI_API_KEY = \"API_KEY_KAMU\"."
+        )
     try:
         client = genai.Client(api_key=key)
         response = client.models.generate_content(
             model="gemini-2.5-flash",
-            contents=prompt
+            contents=(
+                "Anda adalah asisten analisis data untuk proyek mahasiswa TI semester 3. "
+                "Gunakan bahasa Indonesia yang sederhana, jelas, dan tidak terlalu panjang. "
+                "Jelaskan hanya berdasarkan angka yang diberikan. Jangan mengarang fakta, "
+                "jangan menyatakan sebab-akibat, dan selalu sebutkan keterbatasan dataset kecil. "
+                "Susun jawaban menjadi 2-3 paragraf pendek.\\n\\n" + prompt
+            )
         )
-        return response.text or "Gemini tidak mengembalikan penjelasan."
+        answer = getattr(response, "text", None)
+        if answer and answer.strip():
+            return answer.strip()
+        return "Gemini berhasil dipanggil, tetapi tidak mengembalikan teks. Coba muat ulang aplikasi."
     except Exception as e:
-        return f"Gemini belum dapat digunakan. Periksa API key/kuota. Detail: {e}"
+        return (
+            "Gemini belum berhasil membuat penjelasan. Periksa API key, kuota, dan akses model. "
+            f"Detail teknis: {type(e).__name__}: {e}"
+        )
 
-st.title("🏠 KosFinder Madiun")
-st.caption("Dashboard analisis dan prediksi harga kos di Kota Madiun")
-st.markdown("Temukan gambaran harga kos berdasarkan jenis kos dan kecamatan.")
+def show_ai_explanation(title, prompt):
+    st.markdown(f"**✨ Penjelasan AI — {title}**")
+    with st.container(border=True):
+        with st.spinner("Gemini sedang menganalisis ringkasan data..."):
+            explanation = explain_with_gemini(title, prompt)
+        st.markdown(explanation)
+
+# -------------------- Header --------------------
+st.markdown("""
+<div class="hero">
+    <h1>🏠 KosFinder Madiun</h1>
+    <p>Dashboard analisis dan prediksi harga kos di Kota Madiun</p>
+    <p style="margin-top:12px;font-size:.9rem;">Informasi data • Visualisasi • Prediksi Machine Learning • Insight AI</p>
+</div>
+""", unsafe_allow_html=True)
 
 try:
     df = load_data()
     model = load_model()
 except Exception as e:
     st.error(f"Data atau model gagal dimuat: {e}")
-    st.info("Pastikan dataset tersedia di GitHub dan file model ada pada folder models.")
+    st.info(
+        "Pastikan file dataset tersedia di GitHub dan file "
+        "`model_kosfinder.joblib` berada di halaman utama repository."
+    )
+    st.stop()
+
+required = ["Nama Kos", "Jenis Kos", "Kecamatan", "Harga Bulanan (Rp)"]
+missing = [c for c in required if c not in df.columns]
+if missing:
+    st.error(f"Kolom wajib tidak ditemukan: {missing}")
     st.stop()
 
 df["Harga Bulanan (Rp)"] = pd.to_numeric(df["Harga Bulanan (Rp)"], errors="coerce")
 data = df.dropna(subset=["Harga Bulanan (Rp)"]).copy()
+data["Kecamatan"] = data["Kecamatan"].fillna("Tidak diketahui").astype(str)
+data["Jenis Kos"] = data["Jenis Kos"].fillna("Tidak diketahui").astype(str)
 
-a, b, c = st.columns(3)
-a.metric("Jumlah data harga", f"{len(data)}")
-b.metric("Rata-rata harga", f"Rp{data['Harga Bulanan (Rp)'].mean():,.0f}")
-c.metric("Median harga", f"Rp{data['Harga Bulanan (Rp)'].median():,.0f}")
+# -------------------- Sidebar --------------------
+with st.sidebar:
+    st.markdown("## 🏠 KosFinder")
+    st.caption("Mini Project Sistem Cerdas")
+    page = st.radio(
+        "Navigasi",
+        ["Ringkasan Dashboard", "Analisis Data", "Prediksi Harga", "Tentang Proyek"],
+        label_visibility="collapsed"
+    )
+    st.divider()
+    st.caption("Sumber data: GitHub — KosFinder-Madiun")
+    st.caption(f"Jumlah listing harga: {len(data)}")
 
-tab1, tab2, tab3 = st.tabs(["Dashboard", "Prediksi Harga", "Tentang Data"])
+# -------------------- Summary metrics --------------------
+avg_price = data["Harga Bulanan (Rp)"].mean()
+median_price = data["Harga Bulanan (Rp)"].median()
+min_price = data["Harga Bulanan (Rp)"].min()
+max_price = data["Harga Bulanan (Rp)"].max()
 
-with tab1:
-    st.subheader("Data kos")
-    show_cols = [c for c in ["Nama Kos", "Jenis Kos", "Kecamatan", "Harga Bulanan (Rp)", "Periode"] if c in data.columns]
-    st.dataframe(data[show_cols], use_container_width=True)
-    st.subheader("Distribusi harga kos")
-    fig, ax = plt.subplots(figsize=(9, 4))
-    ax.hist(data["Harga Bulanan (Rp)"], bins=8, edgecolor="black")
-    ax.set_xlabel("Harga bulanan (Rp)")
-    ax.set_ylabel("Jumlah listing")
-    ax.set_title("Distribusi Harga Kos")
-    st.pyplot(fig)
+if page == "Ringkasan Dashboard":
+    st.subheader("Ringkasan data kos")
+    st.caption("Gambaran umum berdasarkan sheet Data Harga pada dataset.")
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Jumlah listing", f"{len(data)}")
+    c2.metric("Rata-rata harga", f"Rp{avg_price:,.0f}")
+    c3.metric("Median harga", f"Rp{median_price:,.0f}")
+    c4.metric("Rentang harga", f"Rp{min_price:,.0f} – Rp{max_price:,.0f}")
+
+    left, right = st.columns([1.15, 0.85])
+    with left:
+        st.markdown("### Distribusi harga kos")
+        fig, ax = plt.subplots(figsize=(8, 4))
+        ax.hist(data["Harga Bulanan (Rp)"], bins=8, color="#238b8e", edgecolor="white")
+        ax.set_xlabel("Harga bulanan (Rp)")
+        ax.set_ylabel("Jumlah listing")
+        ax.spines[["top", "right"]].set_visible(False)
+        ax.grid(axis="y", alpha=.2)
+        st.pyplot(fig, use_container_width=True)
+        plt.close(fig)
+    with right:
+        st.markdown("### Komposisi jenis kos")
+        jenis_counts = data["Jenis Kos"].value_counts()
+        fig2, ax2 = plt.subplots(figsize=(6, 4))
+        ax2.pie(
+            jenis_counts.values, labels=jenis_counts.index, autopct="%1.0f%%",
+            startangle=90, colors=["#176b87", "#37a6a0", "#f2b56b", "#8b9dc3", "#9bc1bc"]
+        )
+        ax2.axis("equal")
+        st.pyplot(fig2, use_container_width=True)
+        plt.close(fig2)
+
     prompt = (
-        "Jelaskan grafik distribusi harga kos berikut dalam bahasa Indonesia sederhana. "
-        "Jangan mengarang fakta, jangan menyimpulkan sebab-akibat. "
-        f"Jumlah listing={len(data)}, rata-rata=Rp{data['Harga Bulanan (Rp)'].mean():.0f}, "
-        f"median=Rp{data['Harga Bulanan (Rp)'].median():.0f}, "
-        f"minimum=Rp{data['Harga Bulanan (Rp)'].min():.0f}, "
-        f"maksimum=Rp{data['Harga Bulanan (Rp)'].max():.0f}. "
-        "Sebutkan keterbatasan dataset kecil."
+        f"Ringkasan distribusi harga kos di Madiun: jumlah listing {len(data)}, "
+        f"rata-rata Rp{avg_price:.0f}, median Rp{median_price:.0f}, "
+        f"minimum Rp{min_price:.0f}, maksimum Rp{max_price:.0f}. "
+        f"Jumlah listing menurut jenis kos: {jenis_counts.to_dict()}. "
+        "Jelaskan sebaran harga dan komposisi jenis kos secara hati-hati."
     )
-    with st.expander("✨ Penjelasan grafik oleh Gemini", expanded=True):
-        st.write(gemini_explain(prompt))
+    show_ai_explanation("Ringkasan Dashboard", prompt)
 
-    st.subheader("Rata-rata harga berdasarkan kecamatan")
-    by_area = data.groupby("Kecamatan")["Harga Bulanan (Rp)"].mean().sort_values(ascending=False)
-    st.bar_chart(by_area)
+    st.markdown("### Data kos terbaru")
+    st.dataframe(
+        data[["Nama Kos", "Jenis Kos", "Kecamatan", "Harga Bulanan (Rp)"]].head(10),
+        use_container_width=True,
+        hide_index=True
+    )
+
+elif page == "Analisis Data":
+    st.subheader("Analisis data kos")
+    st.caption("Grafik dan tabel dihitung langsung menggunakan Pandas.")
+    by_area = (
+        data.groupby("Kecamatan")["Harga Bulanan (Rp)"]
+        .agg(["count", "mean", "median"])
+        .sort_values("mean", ascending=False)
+    )
+    st.markdown("### Rata-rata harga berdasarkan kecamatan")
+    st.bar_chart(by_area["mean"], color="#238b8e")
+    st.dataframe(
+        by_area.rename(columns={
+            "count": "Jumlah listing", "mean": "Rata-rata harga (Rp)",
+            "median": "Median harga (Rp)"
+        }).style.format({
+            "Rata-rata harga (Rp)": "Rp{:,.0f}",
+            "Median harga (Rp)": "Rp{:,.0f}"
+        }),
+        use_container_width=True
+    )
     prompt_area = (
-        "Jelaskan tabel rata-rata harga kos per kecamatan berikut secara sederhana. "
-        "Gunakan angka yang tersedia saja, jangan mengarang penyebab atau sebab-akibat. "
-        f"Data: {by_area.round(0).to_dict()}. "
-        "Sebutkan bahwa jumlah data per kecamatan mungkin berbeda."
+        "Tabel ringkasan harga per kecamatan (jumlah listing, rata-rata, median): "
+        f"{by_area.round(0).to_dict(orient='index')}. "
+        "Bandingkan nilai yang terlihat, sebutkan kecamatan dengan rata-rata tertinggi "
+        "dan terendah hanya jika datanya tersedia. Ingatkan bahwa jumlah listing tiap "
+        "kecamatan tidak sama dan data sedikit."
     )
-    with st.expander("✨ Penjelasan tabel kecamatan"):
-        st.write(gemini_explain(prompt_area))
+    show_ai_explanation("Harga per Kecamatan", prompt_area)
 
-with tab2:
-    st.subheader("Prediksi harga bulanan")
-    st.write("Pilih jenis kos dan kecamatan sesuai kategori yang tersedia pada dataset.")
-    jenis_opts = sorted(data["Jenis Kos"].dropna().astype(str).unique())
-    area_opts = sorted(data["Kecamatan"].dropna().astype(str).unique())
-    with st.form("prediction_form"):
-        jenis = st.selectbox("Jenis kos", jenis_opts)
-        area = st.selectbox("Kecamatan", area_opts)
-        submitted = st.form_submit_button("Prediksi harga")
+    st.markdown("### Rata-rata harga berdasarkan jenis kos")
+    by_type = data.groupby("Jenis Kos")["Harga Bulanan (Rp)"].agg(["count", "mean", "median"])
+    st.bar_chart(by_type["mean"], color="#e6a34a")
+    st.dataframe(
+        by_type.rename(columns={
+            "count": "Jumlah listing", "mean": "Rata-rata harga (Rp)",
+            "median": "Median harga (Rp)"
+        }).style.format({
+            "Rata-rata harga (Rp)": "Rp{:,.0f}",
+            "Median harga (Rp)": "Rp{:,.0f}"
+        }),
+        use_container_width=True
+    )
+    prompt_type = (
+        "Tabel ringkasan harga per jenis kos (jumlah listing, rata-rata, median): "
+        f"{by_type.round(0).to_dict(orient='index')}. "
+        "Jelaskan perbedaan nilai rata-rata yang terlihat tanpa menyimpulkan penyebab."
+    )
+    show_ai_explanation("Harga per Jenis Kos", prompt_type)
+
+elif page == "Prediksi Harga":
+    st.subheader("Prediksi harga kos")
+    st.write(
+        "Pilih jenis kos dan kecamatan. Model menggunakan dua fitur tersebut "
+        "untuk memperkirakan harga bulanan."
+    )
+    jenis_opts = sorted(data["Jenis Kos"].dropna().unique().tolist())
+    area_opts = sorted(data["Kecamatan"].dropna().unique().tolist())
+    with st.container(border=True):
+        with st.form("prediction_form"):
+            col1, col2 = st.columns(2)
+            with col1:
+                jenis = st.selectbox("Jenis kos", jenis_opts)
+            with col2:
+                area = st.selectbox("Kecamatan", area_opts)
+            submitted = st.form_submit_button("✨ Prediksi harga", use_container_width=True)
     if submitted:
         input_df = pd.DataFrame([{"Jenis Kos": jenis, "Kecamatan": area}])
         estimate = float(model.predict(input_df)[0])
         st.success(f"Perkiraan harga: Rp{estimate:,.0f} per bulan")
-        st.write(gemini_explain(
-            "Jelaskan hasil prediksi prototipe KosFinder Madiun. "
-            f"Input jenis kos={jenis}; kecamatan={area}; hasil model=Rp{estimate:,.0f}/bulan. "
-            "Jelaskan bahwa ini estimasi model dari dataset terbatas, bukan harga pasti."
-        ))
+        show_ai_explanation(
+            "Hasil Prediksi",
+            f"Model memprediksi harga Rp{estimate:.0f} per bulan untuk jenis kos '{jenis}' "
+            f"di Kecamatan '{area}'. Fitur model hanya Jenis Kos dan Kecamatan. "
+            "Jelaskan makna hasil dan tekankan bahwa prediksi bukan harga pasti, "
+            "karena dataset terbatas dan faktor fasilitas/luas/kondisi tidak menjadi fitur model."
+        )
+    st.info(
+        "Catatan: hasil adalah estimasi model pembelajaran, bukan harga pasar yang dijamin. "
+        "Model saat ini hanya menggunakan jenis kos dan kecamatan."
+    )
 
-with tab3:
-    st.subheader("Informasi dataset")
-    st.write("Dataset diambil dari repository GitHub proyek KosFinder-Madiun.")
-    st.write("Sheet yang digunakan untuk model: **Data Harga**.")
-    st.write("Fitur model: **Jenis Kos** dan **Kecamatan**.")
-    st.write("Target model: **Harga Bulanan (Rp)**.")
+else:
+    st.subheader("Tentang KosFinder Madiun")
+    st.markdown("""
+    KosFinder Madiun merupakan mini project Sistem Cerdas untuk membantu melihat
+    gambaran harga kos di Kota Madiun melalui analisis data dan prediksi Machine Learning.
+
+    **Sumber dan pengolahan data**
+    - Dataset dibaca dari repository GitHub proyek.
+    - Sheet yang digunakan untuk analisis harga adalah `Data Harga`.
+    - Fitur model: `Jenis Kos` dan `Kecamatan`.
+    - Target prediksi: `Harga Bulanan (Rp)`.
+
+    **Teknologi**
+    - Python dan Pandas untuk pengolahan data.
+    - Matplotlib dan Streamlit untuk visualisasi dan antarmuka web.
+    - Scikit-learn untuk model regresi.
+    - Google Gemini API untuk membuat penjelasan naratif dari ringkasan statistik yang dihitung Python.
+    """)
     st.warning(
-        "Dataset masih berukuran kecil dan catatan verifikasi menunjukkan sebagian listing "
-        "perlu dikonfirmasi. Prediksi hanya untuk demonstrasi akademik, bukan harga pasar yang dijamin."
+        "Keterbatasan: jumlah data relatif kecil dan sebagian listing masih memerlukan "
+        "verifikasi. Hasil analisis dan prediksi hanya untuk demonstrasi akademik."
     )
 
 st.divider()
-st.caption("Mini Project Sistem Cerdas | KosFinder Madiun")
+st.caption("KosFinder Madiun • Mini Project Sistem Cerdas • Dibuat dengan Python, Streamlit, dan Gemini API")
