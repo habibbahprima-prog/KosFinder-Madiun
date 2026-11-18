@@ -25,7 +25,19 @@ MODEL_PATH = "model_kosfinder.joblib"
 # -------------------- Tampilan --------------------
 st.markdown("""
 <style>
-    .stApp { background: #f5f7fb; }
+    .stApp { background: #f5f7fb; color: #1f2937 !important; }
+    /* Paksa teks utama gelap agar terbaca pada latar terang */
+    .stApp p, .stApp label, .stApp span, .stApp li,
+    .stApp [data-testid="stMarkdownContainer"],
+    .stApp [data-testid="stMetricLabel"],
+    .stApp [data-testid="stMetricValue"],
+    .stApp [data-testid="stMetricDelta"],
+    .stApp h1, .stApp h2, .stApp h3, .stApp h4 {
+        color: #1f2937;
+    }
+    .hero, .hero h1, .hero p { color: #ffffff !important; }
+    .stSidebar, .stSidebar p, .stSidebar label,
+    .stSidebar [data-testid="stMarkdownContainer"] { color: #1f2937 !important; }
     [data-testid="stHeader"] { background: rgba(245,247,251,0.92); }
     .block-container { padding-top: 2rem; padding-bottom: 3rem; max-width: 1200px; }
     .hero {
@@ -89,7 +101,7 @@ def explain_with_gemini(title, prompt):
     try:
         client = genai.Client(api_key=key)
         response = client.models.generate_content(
-            model="gemini-2.5-flash",
+            model="gemini-3.8-flash",
             contents=(
                 "Anda adalah asisten analisis data untuk proyek mahasiswa TI semester 3. "
                 "Gunakan bahasa Indonesia yang sederhana, jelas, dan tidak terlalu panjang. "
