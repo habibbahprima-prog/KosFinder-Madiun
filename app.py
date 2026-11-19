@@ -3,7 +3,7 @@ import pandas as pd
 import streamlit as st
 import joblib
 import matplotlib.pyplot as plt
-from google import genai
+from groq import Groq
 
 # ==========================================================
 # KOSFINDER MADIUN - Dashboard Analisis & Prediksi Harga Kos
@@ -112,51 +112,58 @@ def load_data():
 def load_model():
     return joblib.load(MODEL_PATH)
 
-def get_gemini_key():
-    key = os.getenv("GEMINI_API_KEY", "").strip()
+def get_groq_key():
+    key = os.getenv("GROQ_API_KEY", "").strip()
     if key:
         return key
     try:
-        return str(st.secrets["GEMINI_API_KEY"]).strip()
+        return str(st.secrets["GROQ_API_KEY"]).strip()
     except Exception:
         return ""
 
-def explain_with_gemini(title, prompt):
-    """Meminta Gemini menjelaskan ringkasan hasil hitung Python."""
-    key = get_gemini_key()
+def explain_with_groq(title, prompt):
+    """Meminta Groq membuat penjelasan berdasarkan ringkasan statistik Python."""
+    key = get_groq_key()
     if not key:
         return (
-            "Penjelasan AI belum aktif karena GEMINI_API_KEY belum diatur. "
-            "Buka pengaturan aplikasi di Streamlit Community Cloud → Settings/Secrets, "
-            "lalu tambahkan GEMINI_API_KEY = \"API_KEY_KAMU\"."
+            "Penjelasan AI belum aktif karena GROQ_API_KEY belum diatur. "
+            "Tambahkan GROQ_API_KEY pada Streamlit Community Cloud → App settings → Secrets."
         )
     try:
-        client = genai.Client(api_key=key)
-        response = client.models.generate_content(
-            model="gemini-3.8-flash",
-            contents=(
-                "Anda adalah asisten analisis data untuk proyek mahasiswa TI semester 3. "
-                "Gunakan bahasa Indonesia yang sederhana, jelas, dan tidak terlalu panjang. "
-                "Jelaskan hanya berdasarkan angka yang diberikan. Jangan mengarang fakta, "
-                "jangan menyatakan sebab-akibat, dan selalu sebutkan keterbatasan dataset kecil. "
-                "Susun jawaban menjadi 2-3 paragraf pendek.\\n\\n" + prompt
-            )
+        client = Groq(api_key=key)
+        response = client.chat.completions.create(
+            model="openai/gpt-oss-120b",
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "Anda adalah asisten analisis data untuk mini project mahasiswa TI semester 3. "
+                        "Gunakan bahasa Indonesia sederhana, jelas, dan ringkas. "
+                        "Jelaskan hanya berdasarkan angka yang diberikan. Jangan mengarang fakta "
+                        "atau menyatakan sebab-akibat. Sebutkan keterbatasan dataset bila relevan. "
+                        "Tulis 2 sampai 3 paragraf pendek."
+                    ),
+                },
+                {"role": "user", "content": f"Judul: {title}\\n\\n{prompt}"},
+            ],
+            temperature=0.3,
+            max_tokens=500,
         )
-        answer = getattr(response, "text", None)
+        answer = response.choices[0].message.content
         if answer and answer.strip():
             return answer.strip()
-        return "Gemini berhasil dipanggil, tetapi tidak mengembalikan teks. Coba muat ulang aplikasi."
+        return "Groq berhasil dipanggil, tetapi tidak mengembalikan teks. Coba muat ulang aplikasi."
     except Exception as e:
         return (
-            "Gemini belum berhasil membuat penjelasan. Periksa API key, kuota, dan akses model. "
-            f"Detail teknis: {type(e).__name__}: {e}"
+            "Groq belum berhasil membuat penjelasan. Periksa API key, batas penggunaan, "
+            f"dan akses model. Detail teknis: {type(e).__name__}: {e}"
         )
 
 def show_ai_explanation(title, prompt):
     st.markdown(f"**✨ Penjelasan AI — {title}**")
     with st.container(border=True):
-        with st.spinner("Gemini sedang menganalisis ringkasan data..."):
-            explanation = explain_with_gemini(title, prompt)
+        with st.spinner("Groq sedang menganalisis ringkasan data..."):
+            explanation = explain_with_groq(title, prompt)
         st.markdown(explanation)
 
 # -------------------- Header --------------------
@@ -278,7 +285,23 @@ if page == "Ringkasan Dashboard":
         }])
         try:
             quick_estimate = float(model.predict(quick_input)[0])
-            st.success(f"Perkiraan harga kos: Rp{quick_estimate:,.0f} per bulan")
+            st.markdown(
+                f"""
+                <div style="background:#e7f5ef;border:1px solid #a8d8bf;border-radius:12px;
+                            padding:18px 20px;margin:12px 0;">
+                    <div style="color:#246b4a;font-size:14px;font-weight:600;">
+                        HASIL PERKIRAAN HARGA PER BULAN
+                    </div>
+                    <div style="color:#145b3c;font-size:30px;font-weight:800;margin-top:4px;">
+                        Rp{quick_estimate:,.0f}
+                    </div>
+                    <div style="color:#246b4a;font-size:13px;margin-top:4px;">
+                        {quick_jenis} • Kecamatan {quick_area}
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
             st.caption(
                 "Estimasi model, bukan harga pasti. Model saat ini hanya menggunakan "
                 "jenis kos dan kecamatan sebagai fitur."
@@ -365,7 +388,23 @@ elif page == "Prediksi Harga":
     if submitted:
         input_df = pd.DataFrame([{"Jenis Kos": jenis, "Kecamatan": area}])
         estimate = float(model.predict(input_df)[0])
-        st.success(f"## Rp{estimate:,.0f} / bulan")
+        st.markdown(
+            f"""
+            <div style="background:#e7f5ef;border:1px solid #a8d8bf;border-radius:12px;
+                        padding:18px 20px;margin:12px 0;">
+                <div style="color:#246b4a;font-size:14px;font-weight:600;">
+                    HASIL PERKIRAAN HARGA PER BULAN
+                </div>
+                <div style="color:#145b3c;font-size:30px;font-weight:800;margin-top:4px;">
+                    Rp{estimate:,.0f}
+                </div>
+                <div style="color:#246b4a;font-size:13px;margin-top:4px;">
+                    {jenis} • Kecamatan {area}
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
         st.caption(
             f"Pilihan: {jenis} • Kecamatan {area}. "
             "Hasil merupakan estimasi model, bukan harga pasti."
@@ -398,7 +437,7 @@ else:
     - Python dan Pandas untuk pengolahan data.
     - Matplotlib dan Streamlit untuk visualisasi dan antarmuka web.
     - Scikit-learn untuk model regresi.
-    - Google Gemini API untuk membuat penjelasan naratif dari ringkasan statistik yang dihitung Python.
+    - Groq API untuk membuat penjelasan naratif dari ringkasan statistik yang dihitung Python.
     """)
     st.warning(
         "Keterbatasan: jumlah data relatif kecil dan sebagian listing masih memerlukan "
@@ -406,4 +445,4 @@ else:
     )
 
 st.divider()
-st.caption("KosFinder Madiun • Mini Project Sistem Cerdas • Dibuat dengan Python, Streamlit, dan Gemini API")
+st.caption("KosFinder Madiun • Mini Project Sistem Cerdas • Dibuat dengan Python, Streamlit, dan Groq API")
